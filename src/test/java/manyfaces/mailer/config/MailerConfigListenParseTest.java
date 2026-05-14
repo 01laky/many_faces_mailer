@@ -28,4 +28,22 @@ class MailerConfigListenParseTest {
         assertThatThrownBy(() -> MailerConfig.parseListenAddressForTest(":70000"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rejects_host_without_port() {
+        assertThatThrownBy(() -> MailerConfig.parseListenAddressForTest("127.0.0.1"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejects_zero_port() {
+        assertThatThrownBy(() -> MailerConfig.parseListenAddressForTest(":0"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejects_trailing_colon_only() {
+        assertThatThrownBy(() -> MailerConfig.parseListenAddressForTest("host:"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
