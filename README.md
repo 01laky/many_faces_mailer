@@ -38,6 +38,13 @@ Stop:
 ./scripts/stop-mailer-worker.sh
 ```
 
+## TLS / mTLS smoke (CI + local)
+
+- **`docker-compose.tls-smoke.yml`** — isolated worker with server TLS + mTLS (PEMs under **`MAILER_TLS_SMOKE_CERT_DIR`**). Default published gRPC: **`127.0.0.1:59216`** (does not collide with push TLS smoke **59215**).
+- **`scripts/smoke-grpc-tls.sh`** — generates a throwaway CA + certs, runs **`grpcurl`** `Health/Check`, then optional **`dotnet test`** filtered to **`MailerWorkerTlsEndToEndSmokeTests`** (`MAILER_TLS_SMOKE=1`). Docker Compose project: **`mf-mailer-tls-smoke`** (same name as `clear-all-dev.sh`).
+
+Monorepo guide: **`docs/guides/mailer-grpc-tls-mtls.md`**.
+
 ## C# client stubs (many_faces_backend)
 
 The canonical contract is **`proto/manyfaces/mailer/v1/mailer.proto`**. The backend references this path from `BeDemo.Api.csproj` (`Protobuf` item with `GrpcServices="Client"`) so `dotnet build` regenerates `ManyFaces.Mailer.V1` types — same policy as push/search.

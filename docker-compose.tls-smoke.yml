@@ -1,0 +1,35 @@
+# Isolated mailer-worker for TLS/mTLS smoke tests (CI and local).
+# Host port 59216 maps to container :50054 (avoids collision with push TLS smoke 59215).
+# PEM bundle is mounted read-only at /tls (same layout as many_faces_push).
+# Run: MAILER_TLS_SMOKE_CERT_DIR="$(pwd)/certs" docker compose -f docker-compose.tls-smoke.yml --project-name mf-mailer-tls-smoke up -d --build
+#
+# SMTP is not exercised by the smoke script (only grpc.health). MAILER_SMTP_* points at a discard port so accidental sends fail fast if someone extends the test.
+
+services:
+  mailer-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: many-faces-mailer-worker:tls-smoke
+    container_name: mailer-worker-tls-smoke
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0
+      - MAILER_WORKER_GRPC_LISTEN=:50054
+      - MAILER_WORKER_GRPC_REFLECTION=0
+      - MAILER_WORKER_GRPC_TLS_CERT_FILE=/tls/server.crt
+      - MAILER_WORKER_GRPC_TLS_KEY_FILE=/tls/server.key
+      - MAILER_WORKER_GRPC_MTLS_CLIENT_CA_FILE=/tls/ca.crt
+      - MAILER_SMTP_HOST=127.0.0.1
+      - MAILER_SMTP_PORT=24999
+      - MAILER_FROM_EMAIL=no-reply@example.invalid
+      - MAILER_FROM_DISPLAY_NAME=TLS Smoke
+    ports:
+      - "59216:50054"
+    volumes:
+      - ${MAILER_TLS_SMOKE_CERT_DIR:?MAILER_TLS_SMOKE_CERT_DIR must point to a directory containing ca.crt, server.crt, server.key, client.crt, client.key}:/tls:ro
+    networks:
+      - tls-smoke-net
+
+networks:
+  tls-smoke-net:
+    driver: bridge

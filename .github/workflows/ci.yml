@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate docker compose
         run: docker compose -f docker-compose.yml config
+      - name: Validate TLS smoke compose (requires MAILER_TLS_SMOKE_CERT_DIR)
+        run: MAILER_TLS_SMOKE_CERT_DIR=/tmp docker compose -f docker-compose.tls-smoke.yml -p mf-mailer-tls-smoke config
 
   gradle:
     runs-on: ubuntu-latest
