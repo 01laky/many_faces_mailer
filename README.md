@@ -11,6 +11,15 @@ Linked as a **git submodule** from `many_faces_main` at `many_faces_mailer/`.
 2. This worker **renders** HTML + plain text from **`src/main/resources/templates/`** and subject lines from **`src/main/resources/i18n/`**.
 3. **SMTP** delivers to Mailpit (dev) or a transactional relay (prod).
 
+```mermaid
+flowchart LR
+    be["many_faces_backend"] --> grpc["SendTemplatedEmail gRPC"]
+    grpc --> val["Validate template params recipients"]
+    val --> peb["Pebble + ResourceBundle"]
+    peb --> smtp["Angus Mail SMTP"]
+    smtp --> sink["Mailpit or relay"]
+```
+
 ## Template catalog (v1)
 
 | `template_id` | Required `params` | Supported locales (bundles) |
