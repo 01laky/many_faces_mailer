@@ -1,6 +1,7 @@
 # Multi-stage build: Gradle installDist on Temurin JDK 21, then a slim JRE runtime as non-root.
-FROM eclipse-temurin:21-jdk-alpine AS build
-RUN apk add --no-cache bash
+# Build on glibc (Jammy): protobuf/grpc extract native protoc plugins that do not run on Alpine/musl
+# (CI arm64 + Docker Desktop aarch64 hit "program not found or is not executable" with jdk-alpine).
+FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /workspace
 COPY . .
 RUN chmod +x gradlew \
