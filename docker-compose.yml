@@ -1,0 +1,14 @@
+# Local development skeleton for many_faces_mailer.
+# Attach to many_faces_main_dev-network from the monorepo when wiring backend Mail:* settings.
+services:
+  mailer-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: many-faces-mailer-worker:dev
+    container_name: mailer-worker-dev
+    environment:
+      - MAILER_WORKER_GRPC_LISTEN=:50054
+    ports:
+      - "${MAILER_WORKER_GRPC_HOST_PORT:-59204}:50054"
+    restart: "no"
