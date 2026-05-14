@@ -24,7 +24,8 @@ import org.slf4j.MDC;
  * gRPC entry point for transactional sends: validates the contract, renders templates server-side, then blocks on SMTP.
  *
  * <p>Security posture: this class never logs raw {@code params} maps (they may include signed callback URLs with
- * secrets). Only {@code template_id}, {@code locale}, correlation id, and recipient counts are logged at INFO.
+ * secrets). Only {@code template_id}, {@code locale}, correlation id, recipient counts, {@code smtp_host}/{@code smtp_port},
+ * and {@code duration_ms} are logged at INFO (never raw {@code params} or full callback URLs).
  */
 public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImplBase {
 
@@ -50,6 +51,9 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
         String correlationId = Optional.ofNullable(MDC.get(MailerCorrelationInterceptor.MDC_CORRELATION_ID))
                 .filter(s -> !s.isBlank())
                 .orElseGet(() -> UUID.randomUUID().toString());
+        long t0 = System.nanoTime();
+        String smtpHost = mailerConfig.smtpHost();
+        int smtpPort = mailerConfig.smtpPort();
         try {
             validateRecipients(request);
             String templateId = request.getTemplateId().trim();
@@ -85,32 +89,66 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
             if (smtpMessageId != null) {
                 rb.setSmtpMessageId(smtpMessageId);
             }
+            long durationMs = durationMillisSince(t0);
             LOG.info(
-                    "SendTemplatedEmail ok correlation={} template_id={} locale={} to_count={}",
+                    "SendTemplatedEmail ok correlation={} template_id={} locale={} to_count={} smtp_host={} smtp_port={} duration_ms={}",
                     correlationId,
                     templateId,
                     localeTag,
-                    to.size());
+                    to.size(),
+                    smtpHost,
+                    smtpPort,
+                    durationMs);
             responseObserver.onNext(rb.build());
             responseObserver.onCompleted();
         } catch (io.grpc.StatusRuntimeException sre) {
             responseObserver.onError(sre);
         } catch (IllegalArgumentException iae) {
+            LOG.warn(
+                    "SendTemplatedEmail invalid_argument correlation={} template_id_hint={} smtp_host={} smtp_port={} duration_ms={} detail={}",
+                    correlationId,
+                    request.getTemplateId(),
+                    smtpHost,
+                    smtpPort,
+                    durationMillisSince(t0),
+                    iae.getMessage());
             responseObserver.onError(
                     io.grpc.Status.INVALID_ARGUMENT.withDescription(iae.getMessage()).asRuntimeException());
         } catch (jakarta.mail.AuthenticationFailedException afe) {
-            LOG.warn("SMTP authentication failed: {}", afe.getMessage());
+            LOG.warn(
+                    "SMTP authentication failed correlation={} smtp_host={} smtp_port={} duration_ms={} detail={}",
+                    correlationId,
+                    smtpHost,
+                    smtpPort,
+                    durationMillisSince(t0),
+                    afe.getMessage());
             responseObserver.onError(
                     io.grpc.Status.FAILED_PRECONDITION.withDescription("SMTP authentication failed").asRuntimeException());
         } catch (jakarta.mail.MessagingException me) {
-            LOG.warn("SMTP failure: {}", me.getMessage());
+            LOG.warn(
+                    "SMTP transport error correlation={} smtp_host={} smtp_port={} duration_ms={} detail={}",
+                    correlationId,
+                    smtpHost,
+                    smtpPort,
+                    durationMillisSince(t0),
+                    me.getMessage());
             responseObserver.onError(
                     io.grpc.Status.UNAVAILABLE.withDescription("SMTP transport error: " + me.getMessage())
                             .asRuntimeException());
         } catch (Exception e) {
-            LOG.error("Unexpected send failure", e);
+            LOG.error(
+                    "Unexpected send failure correlation={} smtp_host={} smtp_port={} duration_ms={}",
+                    correlationId,
+                    smtpHost,
+                    smtpPort,
+                    durationMillisSince(t0),
+                    e);
             responseObserver.onError(io.grpc.Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
         }
+    }
+
+    private static long durationMillisSince(long t0Nanos) {
+        return (System.nanoTime() - t0Nanos) / 1_000_000L;
     }
 
     private static void validateRecipients(SendTemplatedEmailRequest request) {
