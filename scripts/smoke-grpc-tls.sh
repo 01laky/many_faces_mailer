@@ -68,15 +68,18 @@ openssl x509 -req -in "$CERT_DIR/client.csr" -CA "$CERT_DIR/ca.crt" -CAkey "$CER
   -out "$CERT_DIR/client.crt" -days 1 -sha256
 
 chmod 755 "$CERT_DIR"
-chmod a+r "$CERT_DIR"/*.crt "$CERT_DIR"/*.key 2>/dev/null || true
+chmod a+r "$CERT_DIR"/*.crt "$CERT_DIR/server.key" 2>/dev/null || true
+chmod 600 "$CERT_DIR/client.key"
 
 echo "== Starting mailer-worker (TLS + mTLS)"
 (cd "$MAILER_DIR" && docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d --build)
 
+sleep 2
+
 echo "== Waiting for grpc.health Check (grpcurl, TLS + mTLS)"
 GRPC_OK=0
 for _ in $(seq 1 60); do
-  if grpcurl -cacert "$CERT_DIR/ca.crt" -cert "$CERT_DIR/client.crt" -key "$CERT_DIR/client.key" \
+  if grpcurl -servername localhost -cacert "$CERT_DIR/ca.crt" -cert "$CERT_DIR/client.crt" -key "$CERT_DIR/client.key" \
     -d '{}' 127.0.0.1:59216 grpc.health.v1.Health/Check >/dev/null 2>&1; then
     echo "   grpcurl Health/Check succeeded"
     GRPC_OK=1
@@ -86,7 +89,9 @@ for _ in $(seq 1 60); do
 done
 if [[ "$GRPC_OK" != "1" ]]; then
   echo "grpcurl Health/Check did not succeed in time" >&2
-  docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" logs --tail 120 mailer-worker >&2 || true
+  (cd "$MAILER_DIR" && docker compose -f "$COMPOSE_FILE" -p "$PROJECT_NAME" logs --tail 120 mailer-worker) >&2 || true
+  grpcurl -servername localhost -cacert "$CERT_DIR/ca.crt" -cert "$CERT_DIR/client.crt" -key "$CERT_DIR/client.key" \
+    -d '{}' 127.0.0.1:59216 grpc.health.v1.Health/Check >&2 || true
   exit 1
 fi
 
