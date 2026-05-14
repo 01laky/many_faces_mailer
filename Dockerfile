@@ -2,6 +2,9 @@
 # Build on glibc (Jammy): protobuf/grpc extract native protoc plugins that do not run on Alpine/musl
 # (CI arm64 + Docker Desktop aarch64 hit "program not found or is not executable" with jdk-alpine).
 FROM eclipse-temurin:21-jdk-jammy AS build
+RUN apt-get update -qq && apt-get install -y -qq git >/dev/null \
+    && git clone --depth 1 https://github.com/01laky/many_faces_proto.git /mfproto
+ENV MANY_FACES_PROTO_DIR=/mfproto/proto
 WORKDIR /workspace
 COPY . .
 RUN chmod +x gradlew \

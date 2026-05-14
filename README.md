@@ -56,7 +56,7 @@ Monorepo guide: **`docs/guides/mailer-grpc-tls-mtls.md`**.
 
 ## C# client stubs (many_faces_backend)
 
-The canonical contract is **`proto/manyfaces/mailer/v1/mailer.proto`**. The backend references this path from `BeDemo.Api.csproj` (`Protobuf` item with `GrpcServices="Client"`) so `dotnet build` regenerates `ManyFaces.Mailer.V1` types — same policy as push/search.
+The canonical **`.proto`** lives in the **`many_faces_proto`** submodule (`manyfaces/mailer/v1/mailer.proto`). Gradle resolves **`../many_faces_proto/proto`** from this repo root (monorepo) or **`MANY_FACES_PROTO_DIR`** in Docker/standalone CI. **`many_faces_backend`** generates the C# client from the same paths via `BeDemo.Api.csproj`.
 
 ## Environment
 

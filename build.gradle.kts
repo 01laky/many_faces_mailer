@@ -25,6 +25,17 @@ val grpcVersion = "1.66.0"
 val protobufVersion = "3.25.5"
 val junitVersion = "5.11.4"
 
+// Canonical .proto files live in many_faces_proto (monorepo sibling or MANY_FACES_PROTO_DIR for Docker/CI).
+val contractProtoRoot =
+    System.getenv("MANY_FACES_PROTO_DIR")?.trim()?.takeIf { it.isNotEmpty() }?.let { file(it) }
+        ?: file("../many_faces_proto/proto")
+if (!contractProtoRoot.exists()) {
+    throw GradleException(
+        "Proto directory missing: ${contractProtoRoot.absolutePath}. " +
+            "Clone https://github.com/01laky/many_faces_proto.git as ../many_faces_proto or set MANY_FACES_PROTO_DIR.",
+    )
+}
+
 dependencies {
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
     implementation("io.grpc:grpc-protobuf:$grpcVersion")
@@ -67,7 +78,7 @@ protobuf {
 sourceSets {
     main {
         proto {
-            srcDir("proto")
+            srcDir(contractProtoRoot)
         }
     }
 }
