@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import manyfaces.mailer.config.MailerConfig;
@@ -17,6 +18,7 @@ import manyfaces.mailer.v1.SendTemplatedEmailRequest;
 import manyfaces.mailer.v1.SendTemplatedEmailResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * gRPC entry point for transactional sends: validates the contract, renders templates server-side, then blocks on SMTP.
@@ -45,7 +47,9 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
 
     @Override
     public void sendTemplatedEmail(SendTemplatedEmailRequest request, StreamObserver<SendTemplatedEmailResponse> responseObserver) {
-        String correlationId = UUID.randomUUID().toString();
+        String correlationId = Optional.ofNullable(MDC.get(MailerCorrelationInterceptor.MDC_CORRELATION_ID))
+                .filter(s -> !s.isBlank())
+                .orElseGet(() -> UUID.randomUUID().toString());
         try {
             validateRecipients(request);
             String templateId = request.getTemplateId().trim();

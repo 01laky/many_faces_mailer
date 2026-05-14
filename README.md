@@ -53,6 +53,23 @@ The canonical contract is **`proto/manyfaces/mailer/v1/mailer.proto`**. The back
 
 See **`.env.example`**. For monorepo wiring (Mailpit, `Mail:*`, grpcurl), read **`docs/guides/mailer-local-dev.md`** in the parent repository.
 
+## Correlation (gRPC metadata)
+
+`many_faces_backend` forwards these **metadata keys** (lowercase ASCII) on `SendTemplatedEmail` so worker logs can join API traces:
+
+| Metadata key | Source (typical) |
+| ------------ | ---------------- |
+| `x-request-id` | HTTP `X-Request-Id` |
+| `traceparent` | W3C trace context |
+| `tracestate` | W3C trace state (optional) |
+
+`MailerCorrelationInterceptor` copies them into **SLF4J `MDC`**: `correlation_id` (from `x-request-id`, else trace id from `traceparent`, else UUID), plus `traceparent` / `tracestate` when present. The RPC response `correlation_id` field matches `MDC` for successful sends.
+
+## Security
+
+- **Spoofed gRPC sends** — any process that can reach the listener can invoke the worker; require **`MAILER_WORKER_EXPECTED_TOKEN`** (and TLS/mTLS for shared networks) before non-local exposure.
+- **Credential theft** — SMTP credentials are high value; restrict mounts and env injection; rotate on compromise.
+
 ## License
 
 See the root monorepo or team policy (demo stack).

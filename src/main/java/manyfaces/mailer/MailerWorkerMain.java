@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import manyfaces.mailer.config.MailerConfig;
 import manyfaces.mailer.grpc.MailerAuthInterceptor;
+import manyfaces.mailer.grpc.MailerCorrelationInterceptor;
 import manyfaces.mailer.grpc.MailerServiceImpl;
 import manyfaces.mailer.grpccreds.ServerTlsLoader;
 import manyfaces.mailer.smtp.SmtpMailSender;
@@ -18,7 +19,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * JVM entry point: loads env-driven {@link MailerConfig}, binds a Netty gRPC server, registers health + optional
- * reflection, and installs {@link MailerAuthInterceptor} for parity with other Many Faces workers.
+ * reflection, and installs {@link MailerCorrelationInterceptor} then {@link MailerAuthInterceptor} for parity with other Many Faces workers.
  *
  * <p>Shutdown: {@code SIGTERM} from Docker/Kubernetes triggers {@link Runtime#addShutdownHook(Thread)} so in-flight SMTP
  * attempts get a bounded window to finish before the process exits.
@@ -43,6 +44,7 @@ public final class MailerWorkerMain {
 
         NettyServerBuilder serverBuilder = NettyServerBuilder.forAddress(cfg.grpcListenAddress())
                 .maxInboundMessageSize(4 * 1024 * 1024)
+                .intercept(new MailerCorrelationInterceptor())
                 .intercept(new MailerAuthInterceptor(cfg.expectedWorkerToken()));
 
         Optional<SslContext> sslContext =
