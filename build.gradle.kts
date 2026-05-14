@@ -1,24 +1,79 @@
 plugins {
     java
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    application
+    id("com.google.protobuf") version "0.9.4"
 }
 
 group = "manyfaces"
 version = "0.1.0-SNAPSHOT"
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+application {
+    mainClass.set("manyfaces.mailer.MailerWorkerMain")
+}
+
 repositories {
     mavenCentral()
 }
 
+val grpcVersion = "1.66.0"
+val protobufVersion = "3.25.5"
+val junitVersion = "5.11.4"
+
 dependencies {
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
+    implementation("io.grpc:grpc-protobuf:$grpcVersion")
+    implementation("io.grpc:grpc-stub:$grpcVersion")
+    implementation("io.grpc:grpc-services:$grpcVersion")
+    implementation("com.google.protobuf:protobuf-java:$protobufVersion")
+    implementation("javax.annotation:javax.annotation-api:1.3.2")
+    implementation("org.eclipse.angus:angus-mail:2.0.3")
+    implementation("io.pebbletemplates:pebble:3.2.2")
+    implementation("org.slf4j:slf4j-api:2.0.16")
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
+    runtimeOnly("ch.qos.logback:logback-classic:1.5.12")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:$junitVersion")
+    testImplementation("org.assertj:assertj-core:3.26.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:$protobufVersion"
+    }
+    plugins {
+        create("grpc") {
+            artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
+        }
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.plugins {
+                create("grpc")
+            }
+        }
+    }
+}
+
+sourceSets {
+    main {
+        proto {
+            srcDir("proto")
+        }
+    }
 }
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.encoding = "UTF-8"
+    options.compilerArgs.add("-parameters")
 }

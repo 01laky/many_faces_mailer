@@ -1,7 +1,20 @@
-# Placeholder runtime until the Gradle application JAR is packaged here.
-FROM eclipse-temurin:17-jre-alpine
-RUN addgroup -g 10001 app && adduser -u 10001 -G app -D -h /app app
+# Multi-stage build: Gradle installDist on Temurin JDK 21, then a slim JRE runtime as non-root.
+FROM eclipse-temurin:21-jdk-alpine AS build
+RUN apk add --no-cache bash
+WORKDIR /workspace
+COPY . .
+RUN chmod +x gradlew \
+    && ./gradlew --no-daemon installDist
+
+FROM eclipse-temurin:21-jre-alpine
+RUN apk add --no-cache netcat-openbsd \
+    && addgroup -g 10001 app \
+    && adduser -u 10001 -G app -D -h /app app
 WORKDIR /app
+COPY --from=build /workspace/build/install/many-faces-mailer/ ./
+RUN chown -R app:app /app
 USER app
-# Keeps `docker compose up` useful for port/network checks; replace with java -jar when the worker exists.
-CMD ["sh", "-c", "echo many_faces_mailer: gRPC worker skeleton — replace this CMD with the real server; exec sleep infinity"]
+ENV JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0
+EXPOSE 50054
+# installDist shell wrapper invokes java with full classpath; keep working directory on /app.
+CMD ["./bin/many-faces-mailer"]

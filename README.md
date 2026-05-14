@@ -1,21 +1,32 @@
 # many_faces_mailer
 
-Standalone **Java gRPC mailer worker** (SMTP, templated email) for Many Faces.  
-This repository is linked as a **git submodule** from [`many_faces_main`](https://github.com/01laky/many_faces_main) at `many_faces_mailer/`.
+Standalone **Java gRPC mailer worker** (SMTP, templated email, UTF-8 i18n) for Many Faces.  
+Linked as a **git submodule** from `many_faces_main` at `many_faces_mailer/`.
 
-**Toolchain:** The skeleton build targets **Java 17** for local and CI compatibility. The product prompt targets **Java 21+** for the full worker — bump `build.gradle.kts` when the implementation lands.
+**Toolchain:** **Java 21** (Gradle toolchain + Foojay resolver for reproducible CI). **No Spring** — plain `main`, gRPC-Netty, Angus Mail, Pebble.
 
-**Status:** Skeleton only — Gradle, Docker Compose, scripts, and a placeholder container. No gRPC server yet (see monorepo `docs/prompts/smtp-mailer-java-grpc-worker-agent-prompt.md`).
+## Architecture
 
-## Ports (reserved)
+1. **`many_faces_backend`** decides policy (who receives which template) and calls **`SendTemplatedEmail`** over gRPC.
+2. This worker **renders** HTML + plain text from **`src/main/resources/templates/`** and subject lines from **`src/main/resources/i18n/`**.
+3. **SMTP** delivers to Mailpit (dev) or a transactional relay (prod).
+
+## Template catalog (v1)
+
+| `template_id` | Required `params` | Supported locales (bundles) |
+| ------------- | ----------------- | --------------------------- |
+| `identity_email_confirm` | `action_link`, `user_name` | `en`, `sk` |
+| `identity_password_reset` | `action_link`, `user_name` | `en`, `sk` |
+
+## Ports
 
 | Component | Internal gRPC | Default host map |
 | --------- | ------------- | ---------------- |
-| **mailer-worker** | **50054** | **59204** |
+| **mailer-worker** | **50054** | **59204** (`MAILER_WORKER_GRPC_HOST_PORT`) |
+| **mailpit** SMTP | **1025** | **51025** (`MAILPIT_SMTP_HOST_PORT`) |
+| **mailpit** UI | **8025** | **58025** (`MAILPIT_UI_HOST_PORT`) |
 
-## Quick start (placeholder container)
-
-From this directory:
+## Quick start (Docker)
 
 ```bash
 ./scripts/start-mailer-worker.sh
@@ -27,9 +38,13 @@ Stop:
 ./scripts/stop-mailer-worker.sh
 ```
 
+## C# client stubs (many_faces_backend)
+
+The canonical contract is **`proto/manyfaces/mailer/v1/mailer.proto`**. The backend references this path from `BeDemo.Api.csproj` (`Protobuf` item with `GrpcServices="Client"`) so `dotnet build` regenerates `ManyFaces.Mailer.V1` types — same policy as push/search.
+
 ## Environment
 
-See `.env.example`. No secrets are committed.
+See **`.env.example`**. For monorepo wiring (Mailpit, `Mail:*`, grpcurl), read **`docs/guides/mailer-local-dev.md`** in the parent repository.
 
 ## License
 

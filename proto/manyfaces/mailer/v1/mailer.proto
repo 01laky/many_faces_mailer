@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package manyfaces.mailer.v1;
+
+option csharp_namespace = "ManyFaces.Mailer.V1";
+option java_multiple_files = true;
+
+// Internal transactional mailer — called only from many_faces_backend over trusted networks.
+service MailerService {
+  // Renders a registered template (HTML + plain text) and delivers via SMTP.
+  rpc SendTemplatedEmail(SendTemplatedEmailRequest) returns (SendTemplatedEmailResponse);
+}
+
+message SendTemplatedEmailRequest {
+  repeated string to = 1;
+  repeated string cc = 2;
+  repeated string bcc = 3;
+  string template_id = 4;
+  string locale = 5;
+  map<string, string> params = 6;
+  optional string reply_to = 7;
+  optional string idempotency_key = 8;
+}
+
+message SendTemplatedEmailResponse {
+  string correlation_id = 1;
+  optional string smtp_message_id = 2;
+}

@@ -1,0 +1,6 @@
+Hello {{ user_name }},
+
+Please confirm your email address by opening this link in your browser:
+{{ action_link }}
+
+If you did not create an account, ignore this message.
