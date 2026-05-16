@@ -24,8 +24,13 @@ flowchart LR
 
 | `template_id` | Required `params` | Supported locales (bundles) |
 | ------------- | ----------------- | --------------------------- |
+| `account_registration_code` | `action_link`, `registration_code`, `user_name`, `expiry_minutes` | `en`, `sk` |
 | `identity_email_confirm` | `action_link`, `user_name` | `en`, `sk` |
 | `identity_password_reset` | `action_link`, `user_name` | `en`, `sk` |
+
+**Signup:** `action_link` must include query **`?hash=`** (opaque invite id). Monorepo flow: **[`docs/guides/email-code-registration.md`](../docs/guides/email-code-registration.md)**.
+
+**Tests:** `AccountRegistrationCodeTemplateEdgeTest` (required params, render, HTML escape).
 
 ## Ports
 
