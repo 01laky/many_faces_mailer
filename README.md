@@ -3,6 +3,11 @@
 Standalone **Java gRPC mailer worker** (SMTP, templated email, UTF-8 i18n) for Many Faces.  
 Linked as a **git submodule** from `many_faces_main` at `many_faces_mailer/`.
 
+```bash
+# From many_faces_main root
+git submodule update --init --recursive many_faces_mailer
+```
+
 **Toolchain:** **Java 21** (Gradle toolchain + Foojay resolver for reproducible CI). **No Spring** — plain `main`, gRPC-Netty, Angus Mail, Pebble.
 
 ## Architecture
@@ -22,11 +27,11 @@ flowchart LR
 
 ## Template catalog (v1)
 
-| `template_id` | Required `params` | Supported locales (bundles) |
-| ------------- | ----------------- | --------------------------- |
-| `account_registration_code` | `action_link`, `registration_code`, `user_name`, `expiry_minutes` | `en`, `sk` |
-| `identity_email_confirm` | `action_link`, `user_name` | `en`, `sk` |
-| `identity_password_reset` | `action_link`, `user_name` | `en`, `sk` |
+| `template_id`               | Required `params`                                                 | Supported locales (bundles) |
+| --------------------------- | ----------------------------------------------------------------- | --------------------------- |
+| `account_registration_code` | `action_link`, `registration_code`, `user_name`, `expiry_minutes` | `en`, `sk`                  |
+| `identity_email_confirm`    | `action_link`, `user_name`                                        | `en`, `sk`                  |
+| `identity_password_reset`   | `action_link`, `user_name`                                        | `en`, `sk`                  |
 
 **Signup:** `action_link` must include query **`?hash=`** (opaque invite id). Monorepo flow: **[`docs/guides/email-code-registration.md`](../docs/guides/email-code-registration.md)**.
 
@@ -34,11 +39,11 @@ flowchart LR
 
 ## Ports
 
-| Component | Internal gRPC | Default host map |
-| --------- | ------------- | ---------------- |
-| **mailer-worker** | **50054** | **59204** (`MAILER_WORKER_GRPC_HOST_PORT`) |
-| **mailpit** SMTP | **1025** | **51025** (`MAILPIT_SMTP_HOST_PORT`) |
-| **mailpit** UI | **8025** | **58025** (`MAILPIT_UI_HOST_PORT`) |
+| Component         | Internal gRPC | Default host map                           |
+| ----------------- | ------------- | ------------------------------------------ |
+| **mailer-worker** | **50054**     | **59204** (`MAILER_WORKER_GRPC_HOST_PORT`) |
+| **mailpit** SMTP  | **1025**      | **51025** (`MAILPIT_SMTP_HOST_PORT`)       |
+| **mailpit** UI    | **8025**      | **58025** (`MAILPIT_UI_HOST_PORT`)         |
 
 ## Quick start (Docker)
 
@@ -71,11 +76,11 @@ See **`.env.example`**. For monorepo wiring (Mailpit, `Mail:*`, grpcurl), read *
 
 `many_faces_backend` forwards these **metadata keys** (lowercase ASCII) on `SendTemplatedEmail` so worker logs can join API traces:
 
-| Metadata key | Source (typical) |
-| ------------ | ---------------- |
-| `x-request-id` | HTTP `X-Request-Id` |
-| `traceparent` | W3C trace context |
-| `tracestate` | W3C trace state (optional) |
+| Metadata key   | Source (typical)           |
+| -------------- | -------------------------- |
+| `x-request-id` | HTTP `X-Request-Id`        |
+| `traceparent`  | W3C trace context          |
+| `tracestate`   | W3C trace state (optional) |
 
 `MailerCorrelationInterceptor` copies them into **SLF4J `MDC`**: `correlation_id` (from `x-request-id`, else trace id from `traceparent`, else UUID), plus `traceparent` / `tracestate` when present. The RPC response `correlation_id` field matches `MDC` for successful sends.
 
