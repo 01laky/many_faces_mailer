@@ -288,6 +288,69 @@ class MailerServiceImplTest {
     }
 
     @Test
+    void sendTemplatedEmail_blankTemplateId_failsInvalidArgument() throws Exception {
+        var req = validConfirmRequest("en").setTemplateId("   ").build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+    }
+
+    @Test
+    void sendTemplatedEmail_paramContainsCarriageReturn_failsInvalidArgument() throws Exception {
+        var req = validConfirmRequest("en").putParams("user_name", "bad\rname").build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+    }
+
+    @Test
+    void sendTemplatedEmail_dedupRecipientsAcrossToCcBcc() throws Exception {
+        var req = SendTemplatedEmailRequest.newBuilder()
+                .addTo("User@Example.COM")
+                .addCc("user@example.com")
+                .setTemplateId(TemplateCatalog.IDENTITY_EMAIL_CONFIRM)
+                .setLocale("en")
+                .putParams("action_link", "https://x")
+                .putParams("user_name", "u")
+                .build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(rec.getError()).isNull();
+    }
+
+    @Test
+    void sendTemplatedEmail_ccBccForwardedToSmtp() throws Exception {
+        var req = validConfirmRequest("en")
+                .addCc("cc@example.com")
+                .addBcc("bcc@example.com")
+                .build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(rec.getError()).isNull();
+        verify(smtpMailSender)
+                .send(
+                        eq(java.util.List.of("user@example.com")),
+                        eq(java.util.List.of("cc@example.com")),
+                        eq(java.util.List.of("bcc@example.com")),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        isNull());
+    }
+
+    @Test
     void sendTemplatedEmail_passwordResetTemplate_succeeds() throws Exception {
         var req = SendTemplatedEmailRequest.newBuilder()
                 .addTo("a@b.com")

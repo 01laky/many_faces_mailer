@@ -15,6 +15,16 @@ class MailerCorrelationInterceptorTest {
     }
 
     @Test
+    void sanitize_trimsAndAcceptsPlainValue() {
+        assertEquals("corr-9", MailerCorrelationInterceptor.sanitize("  corr-9  "));
+    }
+
+    @Test
+    void sanitize_rejectsNullByte() {
+        assertEquals(null, MailerCorrelationInterceptor.sanitize("a\u0000b"));
+    }
+
+    @Test
     void traceIdFromTraceparent_parsesW3cExample() {
         Optional<String> tid = MailerCorrelationInterceptor.traceIdFromTraceparentForTests(
                 "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01");

@@ -46,4 +46,5 @@ class MailerConfigListenParseTest {
         assertThatThrownBy(() -> MailerConfig.parseListenAddressForTest("host:"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
 }
