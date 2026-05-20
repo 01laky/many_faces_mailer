@@ -21,8 +21,9 @@ repositories {
     mavenCentral()
 }
 
-val grpcVersion = "1.66.0"
-val protobufVersion = "3.25.5"
+val grpcVersion = "1.76.0"
+// protobuf-java Maven artifacts use 3.25.x (NuGet Google.Protobuf 3.34.x has no matching java:3.34.1 on Central).
+val protobufVersion = "3.25.8"
 val junitVersion = "5.11.4"
 
 // Canonical .proto files live in nested many_faces_proto submodule (Strategy B) or MANY_FACES_PROTO_DIR for overrides.
