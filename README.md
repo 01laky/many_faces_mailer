@@ -1,7 +1,16 @@
 # many_faces_mailer
 
+**Transactional email worker for Many Faces AI.** This Java 21 gRPC service renders localized templates and sends them through SMTP, while the backend keeps all product policy and recipient decisions.
+
 Standalone **Java gRPC mailer worker** (SMTP, templated email, UTF-8 i18n) for Many Faces.  
 Linked as a **git submodule** from `many_faces_main` at `many_faces_mailer/`.
+
+| Start here  | Value                                 |
+| ----------- | ------------------------------------- |
+| Worker gRPC | `localhost:59204` → container `50054` |
+| Dev SMTP    | Mailpit `localhost:51025`             |
+| Mailpit UI  | `http://localhost:58025`              |
+| Guide       | `../docs/guides/mailer-local-dev.md`  |
 
 ```bash
 # From many_faces_main root
