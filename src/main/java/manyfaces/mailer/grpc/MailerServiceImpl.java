@@ -156,17 +156,24 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
             throw new IllegalArgumentException("At least one 'to' address is required.");
         }
         Set<String> unique = new HashSet<>();
-        for (String t : request.getToList()) {
-            unique.add(t.trim().toLowerCase(Locale.ROOT));
-        }
-        for (String t : request.getCcList()) {
-            unique.add(t.trim().toLowerCase(Locale.ROOT));
-        }
-        for (String t : request.getBccList()) {
-            unique.add(t.trim().toLowerCase(Locale.ROOT));
-        }
+        addRecipients(unique, "to", request.getToList());
+        addRecipients(unique, "cc", request.getCcList());
+        addRecipients(unique, "bcc", request.getBccList());
         if (unique.size() > MAX_RECIPIENTS_TOTAL) {
             throw new IllegalArgumentException("Recipient count after dedup exceeds limit " + MAX_RECIPIENTS_TOTAL);
+        }
+    }
+
+    private static void addRecipients(Set<String> unique, String fieldName, List<String> recipients) {
+        for (String recipient : recipients) {
+            String normalized = recipient.trim().toLowerCase(Locale.ROOT);
+            if (normalized.isEmpty()) {
+                throw new IllegalArgumentException("Blank recipient in '" + fieldName + "' list.");
+            }
+
+            // De-duplicate after trim + case normalization so display casing differences do not
+            // count against the recipient cap. Full RFC address validation is left to Jakarta Mail.
+            unique.add(normalized);
         }
     }
 

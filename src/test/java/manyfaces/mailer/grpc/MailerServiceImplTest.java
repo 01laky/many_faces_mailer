@@ -114,6 +114,45 @@ class MailerServiceImplTest {
     }
 
     @Test
+    void sendTemplatedEmail_blankToRecipient_failsInvalidArgumentBeforeSmtp() throws Exception {
+        var req = validConfirmRequest("en").clearTo().addTo("   ").build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+        assertThat(Status.fromThrowable(rec.getError()).getDescription()).contains("Blank recipient");
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void sendTemplatedEmail_blankCcRecipient_failsInvalidArgumentBeforeSmtp() throws Exception {
+        var req = validConfirmRequest("en").addCc("\t").build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+        assertThat(Status.fromThrowable(rec.getError()).getDescription()).contains("'cc'");
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void sendTemplatedEmail_blankBccRecipient_failsInvalidArgumentBeforeSmtp() throws Exception {
+        var req = validConfirmRequest("en").addBcc("").build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+        assertThat(Status.fromThrowable(rec.getError()).getDescription()).contains("'bcc'");
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+    }
+
+    @Test
     void sendTemplatedEmail_unknownTemplate_failsInvalidArgument() throws Exception {
         var req = validConfirmRequest("en").setTemplateId("unknown_tpl").build();
         StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
@@ -307,6 +346,18 @@ class MailerServiceImplTest {
 
         assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
         assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+    }
+
+    @Test
+    void sendTemplatedEmail_paramContainsNullByte_failsInvalidArgument() throws Exception {
+        var req = validConfirmRequest("en").putParams("user_name", "bad\u0000name").build();
+        StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
+
+        impl.sendTemplatedEmail(req, rec);
+
+        assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
+        verify(templateRenderService, never()).render(anyString(), anyString(), any());
     }
 
     @Test
