@@ -1,8 +1,6 @@
 # many_faces_mailer
 
-**Transactional email worker for Many Faces AI.** This Java 21 gRPC service renders localized templates and sends them through SMTP, while the backend keeps all product policy and recipient decisions.
-
-> **First visit?** **Policy lives in the backend** — this worker only renders templates and delivers mail. Operators configure SMTP from **admin Settings → Infrastructure** (stored in PostgreSQL, sent per gRPC request).
+**Transactional email worker for Many Faces AI.** This Java 21 gRPC service renders localized templates and sends them through SMTP, while the backend keeps all product policy and recipient decisions. Operators configure SMTP from **admin Settings → Infrastructure** (PostgreSQL + per-request gRPC); this worker renders and delivers only.
 
 ### Three pillars
 
