@@ -2,6 +2,16 @@
 
 **Transactional email worker for Many Faces AI.** This Java 21 gRPC service renders localized templates and sends them through SMTP, while the backend keeps all product policy and recipient decisions.
 
+> **First visit?** **Policy lives in the backend** — this worker only renders templates and delivers mail. Operators configure SMTP from **admin Settings → Infrastructure** (stored in PostgreSQL, sent per gRPC request).
+
+### Three pillars
+
+| Pillar | Highlights |
+| ------ | ----------- |
+| **Security** | gRPC **shared-secret** metadata (`x-mailer-worker-token`); optional **TLS** on listener; no public HTTP; backend is sole caller. Templates validated before send. |
+| **AI** | *Not applicable* — deterministic templated email only (Pebble + i18n bundles). |
+| **Configuration** | **Per-request `SmtpTransportConfig`** from admin (host, port, TLS, credentials) **or** env fallback **`MAILER_SMTP_*`**; **`TestSmtpConnection`** RPC for smoke tests. Guide: [`../docs/guides/admin-mailer-configuration.md`](../docs/guides/admin-mailer-configuration.md). |
+
 Standalone **Java gRPC mailer worker** (SMTP, templated email, UTF-8 i18n) for Many Faces.  
 Linked as a **git submodule** from `many_faces_main` at `many_faces_mailer/`.
 
