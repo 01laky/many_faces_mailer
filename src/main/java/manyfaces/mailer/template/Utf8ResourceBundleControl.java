@@ -16,23 +16,23 @@ import java.util.ResourceBundle;
  */
 public final class Utf8ResourceBundleControl extends ResourceBundle.Control {
 
-    @Override
-    public ResourceBundle newBundle(
-            String baseName,
-            Locale locale,
-            String format,
-            ClassLoader loader,
-            boolean reload)
-            throws IllegalAccessException, InstantiationException, IOException {
-        String bundleName = toBundleName(baseName, locale);
-        String resourceName = toResourceName(bundleName, "properties");
-        try (var stream = loader.getResourceAsStream(resourceName)) {
-            if (stream == null) {
-                return null;
-            }
-            try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                return new PropertyResourceBundle(reader);
-            }
-        }
-    }
+	@Override
+	public ResourceBundle newBundle(
+			String baseName,
+			Locale locale,
+			String format,
+			ClassLoader loader,
+			boolean reload)
+			throws IllegalAccessException, InstantiationException, IOException {
+		String bundleName = toBundleName(baseName, locale);
+		String resourceName = toResourceName(bundleName, "properties");
+		try (var stream = loader.getResourceAsStream(resourceName)) {
+			if (stream == null) {
+				return null;
+			}
+			try (Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+				return new PropertyResourceBundle(reader);
+			}
+		}
+	}
 }

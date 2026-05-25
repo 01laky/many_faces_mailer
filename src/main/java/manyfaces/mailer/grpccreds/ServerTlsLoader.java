@@ -17,31 +17,31 @@ import java.util.Optional;
  */
 public final class ServerTlsLoader {
 
-    private ServerTlsLoader() {}
+	private ServerTlsLoader() {}
 
-    /**
+	/**
      * @param certFile server certificate chain PEM
      * @param keyFile matching private key PEM
      * @param clientCaFile optional CA for verifying client certificates (mTLS)
      * @return empty when both cert and key are blank; otherwise a built {@link SslContext}
      */
-    public static Optional<SslContext> loadServerSslContext(String certFile, String keyFile, String clientCaFile) {
-        if (certFile.isEmpty() && keyFile.isEmpty()) {
-            return Optional.empty();
-        }
-        if (certFile.isEmpty() || keyFile.isEmpty()) {
-            throw new IllegalArgumentException("TLS requires both certificate and key file paths.");
-        }
-        try {
-            File cert = new File(certFile);
-            File key = new File(keyFile);
-            SslContextBuilder builder = GrpcSslContexts.forServer(cert, key);
-            if (!clientCaFile.isEmpty()) {
-                builder = builder.trustManager(new File(clientCaFile)).clientAuth(ClientAuth.REQUIRE);
-            }
-            return Optional.of(builder.build());
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to load gRPC TLS material", e);
-        }
-    }
+	public static Optional<SslContext> loadServerSslContext(String certFile, String keyFile, String clientCaFile) {
+		if (certFile.isEmpty() && keyFile.isEmpty()) {
+			return Optional.empty();
+		}
+		if (certFile.isEmpty() || keyFile.isEmpty()) {
+			throw new IllegalArgumentException("TLS requires both certificate and key file paths.");
+		}
+		try {
+			File cert = new File(certFile);
+			File key = new File(keyFile);
+			SslContextBuilder builder = GrpcSslContexts.forServer(cert, key);
+			if (!clientCaFile.isEmpty()) {
+				builder = builder.trustManager(new File(clientCaFile)).clientAuth(ClientAuth.REQUIRE);
+			}
+			return Optional.of(builder.build());
+		} catch (IOException e) {
+			throw new UncheckedIOException("Failed to load gRPC TLS material", e);
+		}
+	}
 }

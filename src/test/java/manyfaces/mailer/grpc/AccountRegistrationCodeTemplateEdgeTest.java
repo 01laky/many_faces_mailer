@@ -26,65 +26,65 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class AccountRegistrationCodeTemplateEdgeTest {
 
-    private static final TemplateRenderService.RenderedEmail SAMPLE =
-            new TemplateRenderService.RenderedEmail("Subject", "<p>code</p>", "code");
+	private static final TemplateRenderService.RenderedEmail SAMPLE =
+			new TemplateRenderService.RenderedEmail("Subject", "<p>code</p>", "code");
 
-    @Mock
-    private TemplateRenderService templateRenderService;
+	@Mock
+	private TemplateRenderService templateRenderService;
 
-    @Mock
-    private SmtpMailSender smtpMailSender;
+	@Mock
+	private SmtpMailSender smtpMailSender;
 
-    private MailerServiceImpl impl;
+	private MailerServiceImpl impl;
 
-    @BeforeEach
-    void setUp() throws Exception {
-        impl = new MailerServiceImpl(
-                MailerConfig.testingMinimal(Locale.forLanguageTag("en")), templateRenderService, smtpMailSender);
-        lenient().when(templateRenderService.render(any(), any(), any())).thenReturn(SAMPLE);
-        lenient().when(smtpMailSender.send(any(), any(), any(), any(), any(), any(), any())).thenReturn("msg-1");
-    }
+	@BeforeEach
+	void setUp() throws Exception {
+		impl = new MailerServiceImpl(
+				MailerConfig.testingMinimal(Locale.forLanguageTag("en")), templateRenderService, smtpMailSender);
+		lenient().when(templateRenderService.render(any(), any(), any())).thenReturn(SAMPLE);
+		lenient().when(smtpMailSender.send(any(), any(), any(), any(), any(), any(), any())).thenReturn("msg-1");
+	}
 
-    @Test
-    void sendTemplatedEmail_acceptsAccountRegistrationCode() throws Exception {
-        var observer = StreamRecorder.<manyfaces.mailer.v1.SendTemplatedEmailResponse>create();
-        impl.sendTemplatedEmail(validRequest().build(), observer);
-        observer.awaitCompletion(5, TimeUnit.SECONDS);
-        assertThat(observer.getError()).isNull();
-        verify(templateRenderService).render(eq(TemplateCatalog.ACCOUNT_REGISTRATION_CODE), eq("en"), any());
-    }
+	@Test
+	void sendTemplatedEmail_acceptsAccountRegistrationCode() throws Exception {
+		var observer = StreamRecorder.<manyfaces.mailer.v1.SendTemplatedEmailResponse>create();
+		impl.sendTemplatedEmail(validRequest().build(), observer);
+		observer.awaitCompletion(5, TimeUnit.SECONDS);
+		assertThat(observer.getError()).isNull();
+		verify(templateRenderService).render(eq(TemplateCatalog.ACCOUNT_REGISTRATION_CODE), eq("en"), any());
+	}
 
-    @Test
-    void sendTemplatedEmail_rejectsMissingRegistrationCode() throws Exception {
-        var observer = StreamRecorder.<manyfaces.mailer.v1.SendTemplatedEmailResponse>create();
-        impl.sendTemplatedEmail(
-                validRequest().clearParams().putParams("action_link", "https://x/register?hash=abc").putParams("user_name", "A").putParams("expiry_minutes", "30").build(),
-                observer);
-        observer.awaitCompletion(5, TimeUnit.SECONDS);
-        assertThat(observer.getError()).isNotNull();
-        assertThat(((io.grpc.StatusRuntimeException) observer.getError()).getStatus().getCode())
-                .isEqualTo(Status.Code.INVALID_ARGUMENT);
-        verify(templateRenderService, never()).render(any(), any(), any());
-    }
+	@Test
+	void sendTemplatedEmail_rejectsMissingRegistrationCode() throws Exception {
+		var observer = StreamRecorder.<manyfaces.mailer.v1.SendTemplatedEmailResponse>create();
+		impl.sendTemplatedEmail(
+				validRequest().clearParams().putParams("action_link", "https://x/register?hash=abc").putParams("user_name", "A").putParams("expiry_minutes", "30").build(),
+				observer);
+		observer.awaitCompletion(5, TimeUnit.SECONDS);
+		assertThat(observer.getError()).isNotNull();
+		assertThat(((io.grpc.StatusRuntimeException) observer.getError()).getStatus().getCode())
+				.isEqualTo(Status.Code.INVALID_ARGUMENT);
+		verify(templateRenderService, never()).render(any(), any(), any());
+	}
 
-    @Test
-    void sendTemplatedEmail_actionLinkMayContainHashQuery() throws Exception {
-        var observer = StreamRecorder.<manyfaces.mailer.v1.SendTemplatedEmailResponse>create();
-        impl.sendTemplatedEmail(
-                validRequest().putParams("action_link", "https://portal.example/en/register/complete?hash=opaque123").build(),
-                observer);
-        observer.awaitCompletion(5, TimeUnit.SECONDS);
-        assertThat(observer.getError()).isNull();
-    }
+	@Test
+	void sendTemplatedEmail_actionLinkMayContainHashQuery() throws Exception {
+		var observer = StreamRecorder.<manyfaces.mailer.v1.SendTemplatedEmailResponse>create();
+		impl.sendTemplatedEmail(
+				validRequest().putParams("action_link", "https://portal.example/en/register/complete?hash=opaque123").build(),
+				observer);
+		observer.awaitCompletion(5, TimeUnit.SECONDS);
+		assertThat(observer.getError()).isNull();
+	}
 
-    private static SendTemplatedEmailRequest.Builder validRequest() {
-        return SendTemplatedEmailRequest.newBuilder()
-                .setTemplateId(TemplateCatalog.ACCOUNT_REGISTRATION_CODE)
-                .setLocale("en")
-                .addTo("user@example.com")
-                .putParams("action_link", "https://portal.example/en/register/complete?hash=opaque")
-                .putParams("registration_code", "ABC234")
-                .putParams("user_name", "Demo")
-                .putParams("expiry_minutes", "30");
-    }
+	private static SendTemplatedEmailRequest.Builder validRequest() {
+		return SendTemplatedEmailRequest.newBuilder()
+				.setTemplateId(TemplateCatalog.ACCOUNT_REGISTRATION_CODE)
+				.setLocale("en")
+				.addTo("user@example.com")
+				.putParams("action_link", "https://portal.example/en/register/complete?hash=opaque")
+				.putParams("registration_code", "ABC234")
+				.putParams("user_name", "Demo")
+				.putParams("expiry_minutes", "30");
+	}
 }
