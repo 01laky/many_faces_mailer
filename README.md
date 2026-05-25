@@ -2,6 +2,8 @@
 
 **Version:** [`0.4.0`](./VERSION) · [Changelog](./CHANGELOG.md)
 
+**Author:** Ladislav Kostolny · [01laky@gmail.com](mailto:01laky@gmail.com)
+
 **Transactional email worker for Many Faces AI.** This Java 21 gRPC service renders localized templates and sends them through SMTP, while the backend keeps all product policy and recipient decisions. Operators configure SMTP from **admin Settings → Infrastructure** (PostgreSQL + per-request gRPC); this worker renders and delivers only.
 
 ### Three pillars
