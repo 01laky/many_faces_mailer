@@ -23,16 +23,19 @@ git submodule update --init --recursive many_faces_mailer
 
 1. **`many_faces_backend`** decides policy (who receives which template) and calls **`SendTemplatedEmail`** over gRPC.
 2. This worker **renders** HTML + plain text from **`src/main/resources/templates/`** and subject lines from **`src/main/resources/i18n/`**.
-3. **SMTP** delivers to Mailpit (dev) or a transactional relay (prod).
+3. **SMTP** delivers to Mailpit (dev) or a transactional relay (prod). When the backend sends **`SmtpTransportConfig`** on the gRPC request (admin-configured relay), the worker uses that transport for the send; otherwise it falls back to **`MAILER_SMTP_*`** env (`MailerConfig.loadFromEnv()`).
 
 ```mermaid
 flowchart LR
     be["many_faces_backend"] --> grpc["SendTemplatedEmail gRPC"]
     grpc --> val["Validate template params recipients"]
-    val --> peb["Pebble + ResourceBundle"]
+    val --> tr["Resolve SMTP: wire block or env"]
+    tr --> peb["Pebble + ResourceBundle"]
     peb --> smtp["Angus Mail SMTP"]
     smtp --> sink["Mailpit or relay"]
 ```
+
+**RPCs:** `SendTemplatedEmail`, `TestSmtpConnection` (TCP/STARTTLS probe, no message sent). See [`docs/guides/admin-mailer-configuration.md`](../docs/guides/admin-mailer-configuration.md).
 
 ## Template catalog (v1)
 

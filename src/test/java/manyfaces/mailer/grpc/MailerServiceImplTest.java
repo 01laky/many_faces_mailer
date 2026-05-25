@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import manyfaces.mailer.config.MailerConfig;
 import manyfaces.mailer.smtp.SmtpMailSender;
+import manyfaces.mailer.smtp.SmtpTransportSettings;
 import manyfaces.mailer.template.TemplateCatalog;
 import manyfaces.mailer.template.TemplateRenderService;
 import manyfaces.mailer.v1.SendTemplatedEmailRequest;
@@ -55,7 +56,7 @@ class MailerServiceImplTest {
         lenient()
                 .doAnswer(invocation -> "smtp-msg-id")
                 .when(smtpMailSender)
-                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull());
+                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull(), any(SmtpTransportSettings.class));
     }
 
     @Test
@@ -70,7 +71,7 @@ class MailerServiceImplTest {
         assertThat(rec.getValues()).hasSize(1);
         assertThat(rec.getValues().get(0).getCorrelationId()).isNotBlank();
         assertThat(rec.getValues().get(0).getSmtpMessageId()).isEqualTo("smtp-msg-id");
-        verify(smtpMailSender).send(anyList(), anyList(), anyList(), eq("Subject"), eq("h"), eq("<p>h</p>"), isNull());
+        verify(smtpMailSender).send(anyList(), anyList(), anyList(), eq("Subject"), eq("h"), eq("<p>h</p>"), isNull(), any(SmtpTransportSettings.class));
     }
 
     @Test
@@ -110,7 +111,7 @@ class MailerServiceImplTest {
 
         assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
         assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
-        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -123,7 +124,7 @@ class MailerServiceImplTest {
         assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
         assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
         assertThat(Status.fromThrowable(rec.getError()).getDescription()).contains("Blank recipient");
-        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -136,7 +137,7 @@ class MailerServiceImplTest {
         assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
         assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
         assertThat(Status.fromThrowable(rec.getError()).getDescription()).contains("'cc'");
-        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -149,7 +150,7 @@ class MailerServiceImplTest {
         assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
         assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
         assertThat(Status.fromThrowable(rec.getError()).getDescription()).contains("'bcc'");
-        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -161,7 +162,7 @@ class MailerServiceImplTest {
 
         assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
         assertThat(Status.fromThrowable(rec.getError()).getCode()).isEqualTo(Status.Code.INVALID_ARGUMENT);
-        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any());
+        verify(smtpMailSender, never()).send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -264,7 +265,7 @@ class MailerServiceImplTest {
     void sendTemplatedEmail_smtpAuth_failsFailedPrecondition() throws Exception {
         doThrow(new AuthenticationFailedException("auth"))
                 .when(smtpMailSender)
-                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull());
+                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull(), any(SmtpTransportSettings.class));
         var req = validConfirmRequest("en").build();
         StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
 
@@ -278,7 +279,7 @@ class MailerServiceImplTest {
     void sendTemplatedEmail_smtpMessaging_failsUnavailable() throws Exception {
         doThrow(new MessagingException("conn reset") {})
                 .when(smtpMailSender)
-                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull());
+                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull(), any(SmtpTransportSettings.class));
         var req = validConfirmRequest("en").build();
         StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
 
@@ -292,7 +293,7 @@ class MailerServiceImplTest {
     void sendTemplatedEmail_smtpUnexpectedRuntime_failsInternal() throws Exception {
         doThrow(new RuntimeException("boom"))
                 .when(smtpMailSender)
-                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull());
+                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), isNull(), any(SmtpTransportSettings.class));
         var req = validConfirmRequest("en").build();
         StreamRecorder<SendTemplatedEmailResponse> rec = StreamRecorder.create();
 
@@ -312,7 +313,7 @@ class MailerServiceImplTest {
         assertThat(rec.awaitCompletion(5, TimeUnit.SECONDS)).isTrue();
         assertThat(rec.getError()).isNull();
         verify(smtpMailSender)
-                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), eq("reply@example.com"));
+                .send(anyList(), anyList(), anyList(), anyString(), anyString(), anyString(), eq("reply@example.com"), any(SmtpTransportSettings.class));
     }
 
     @Test
@@ -398,7 +399,8 @@ class MailerServiceImplTest {
                         anyString(),
                         anyString(),
                         anyString(),
-                        isNull());
+                        isNull(),
+                        any(SmtpTransportSettings.class));
     }
 
     @Test

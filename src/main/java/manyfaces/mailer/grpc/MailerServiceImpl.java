@@ -10,12 +10,16 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import manyfaces.mailer.config.MailerConfig;
+import manyfaces.mailer.smtp.SmtpConnectionProbe;
 import manyfaces.mailer.smtp.SmtpMailSender;
+import manyfaces.mailer.smtp.SmtpTransportSettings;
 import manyfaces.mailer.template.TemplateCatalog;
 import manyfaces.mailer.template.TemplateRenderService;
 import manyfaces.mailer.v1.MailerServiceGrpc;
 import manyfaces.mailer.v1.SendTemplatedEmailRequest;
 import manyfaces.mailer.v1.SendTemplatedEmailResponse;
+import manyfaces.mailer.v1.TestSmtpConnectionRequest;
+import manyfaces.mailer.v1.TestSmtpConnectionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -52,8 +56,16 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
                 .filter(s -> !s.isBlank())
                 .orElseGet(() -> UUID.randomUUID().toString());
         long t0 = System.nanoTime();
-        String smtpHost = mailerConfig.smtpHost();
-        int smtpPort = mailerConfig.smtpPort();
+        SmtpTransportSettings transport;
+        try {
+            transport = resolveTransportForSend(request);
+        } catch (IllegalArgumentException iae) {
+            responseObserver.onError(
+                    io.grpc.Status.INVALID_ARGUMENT.withDescription(iae.getMessage()).asRuntimeException());
+            return;
+        }
+        String smtpHost = transport.host();
+        int smtpPort = transport.port();
         try {
             validateRecipients(request);
             String templateId = request.getTemplateId().trim();
@@ -69,7 +81,6 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
             validateRequiredTemplateKeys(templateId, params);
 
             if (request.hasIdempotencyKey() && !request.getIdempotencyKey().isBlank()) {
-                // v1: log only; future dedup may persist keys with TTL to protect against blind backend retries.
                 LOG.debug("idempotency_key present for correlation {} (not yet deduplicated)", correlationId);
             }
 
@@ -82,7 +93,7 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
 
             String replyTo = request.hasReplyTo() ? request.getReplyTo() : null;
             String smtpMessageId =
-                    smtpMailSender.send(to, cc, bcc, rendered.subject(), rendered.textBody(), rendered.htmlBody(), replyTo);
+                    smtpMailSender.send(to, cc, bcc, rendered.subject(), rendered.textBody(), rendered.htmlBody(), replyTo, transport);
 
             SendTemplatedEmailResponse.Builder rb =
                     SendTemplatedEmailResponse.newBuilder().setCorrelationId(correlationId);
@@ -147,6 +158,60 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
         }
     }
 
+    @Override
+    public void testSmtpConnection(
+            TestSmtpConnectionRequest request, StreamObserver<TestSmtpConnectionResponse> responseObserver) {
+        try {
+            if (!request.hasSmtp()) {
+                responseObserver.onError(
+                        io.grpc.Status.INVALID_ARGUMENT.withDescription("smtp block is required.").asRuntimeException());
+                return;
+            }
+            SmtpTransportSettings transport = SmtpTransportSettings.fromProto(request.getSmtp());
+            transport.validateForSend();
+            SmtpConnectionProbe.probe(transport);
+            responseObserver.onNext(
+                    TestSmtpConnectionResponse.newBuilder()
+                            .setReachable(true)
+                            .setDetail("SMTP connection ok")
+                            .build());
+            responseObserver.onCompleted();
+        } catch (IllegalArgumentException iae) {
+            responseObserver.onError(
+                    io.grpc.Status.INVALID_ARGUMENT.withDescription(iae.getMessage()).asRuntimeException());
+        } catch (jakarta.mail.AuthenticationFailedException afe) {
+            responseObserver.onNext(
+                    TestSmtpConnectionResponse.newBuilder()
+                            .setReachable(false)
+                            .setDetail("SMTP authentication failed")
+                            .build());
+            responseObserver.onCompleted();
+        } catch (jakarta.mail.MessagingException me) {
+            responseObserver.onNext(
+                    TestSmtpConnectionResponse.newBuilder()
+                            .setReachable(false)
+                            .setDetail(me.getMessage() == null ? "SMTP transport error" : me.getMessage())
+                            .build());
+            responseObserver.onCompleted();
+        } catch (Exception e) {
+            responseObserver.onError(io.grpc.Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException());
+        }
+    }
+
+    /** Package-private for unit tests (AMC-J*). */
+    static SmtpTransportSettings resolveTransportForSend(SendTemplatedEmailRequest request, MailerConfig mailerConfig) {
+        if (request.hasSmtp()) {
+            SmtpTransportSettings wire = SmtpTransportSettings.fromProto(request.getSmtp());
+            wire.validateForSend();
+            return wire;
+        }
+        return SmtpTransportSettings.fromConfig(mailerConfig);
+    }
+
+    private SmtpTransportSettings resolveTransportForSend(SendTemplatedEmailRequest request) {
+        return resolveTransportForSend(request, mailerConfig);
+    }
+
     private static long durationMillisSince(long t0Nanos) {
         return (System.nanoTime() - t0Nanos) / 1_000_000L;
     }
@@ -171,8 +236,6 @@ public final class MailerServiceImpl extends MailerServiceGrpc.MailerServiceImpl
                 throw new IllegalArgumentException("Blank recipient in '" + fieldName + "' list.");
             }
 
-            // De-duplicate after trim + case normalization so display casing differences do not
-            // count against the recipient cap. Full RFC address validation is left to Jakarta Mail.
             unique.add(normalized);
         }
     }

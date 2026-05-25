@@ -34,7 +34,7 @@ public final class SmtpMailSender {
     }
 
     /**
-     * Sends multipart/alternative (plain + HTML). Returns SMTP {@code Message-ID} header when the server assigns one.
+     * Sends multipart/alternative (plain + HTML) using env {@link MailerConfig} snapshot.
      */
     public String send(
             List<String> to,
@@ -45,21 +45,29 @@ public final class SmtpMailSender {
             String htmlPart,
             String replyTo)
             throws MessagingException, UnsupportedEncodingException, AddressException {
-        Properties props = new Properties();
-        props.put("mail.smtp.host", cfg.smtpHost());
-        props.put("mail.smtp.port", String.valueOf(cfg.smtpPort()));
-        boolean auth = !cfg.smtpUser().isEmpty();
-        props.put("mail.smtp.auth", Boolean.toString(auth));
-        props.put("mail.smtp.starttls.enable", Boolean.toString(cfg.smtpStartTls()));
-        props.put("mail.smtp.connectiontimeout", "10000");
-        props.put("mail.smtp.timeout", "30000");
-        props.put("mail.smtp.writetimeout", "30000");
+        return send(to, cc, bcc, subject, textPart, htmlPart, replyTo, SmtpTransportSettings.fromConfig(cfg));
+    }
 
+    /**
+     * Sends multipart/alternative (plain + HTML) using per-request transport settings.
+     */
+    public String send(
+            List<String> to,
+            List<String> cc,
+            List<String> bcc,
+            String subject,
+            String textPart,
+            String htmlPart,
+            String replyTo,
+            SmtpTransportSettings transport)
+            throws MessagingException, UnsupportedEncodingException, AddressException {
+        transport.validateForSend();
+        Properties props = SmtpConnectionProbe.sessionProperties(transport);
         Session session = Session.getInstance(props);
         session.setDebug(false);
 
         MimeMessage message = new MimeMessage(session);
-        message.setFrom(buildFromAddress());
+        message.setFrom(buildFromAddress(transport));
         for (String addr : to) {
             message.addRecipient(Message.RecipientType.TO, new InternetAddress(addr.trim()));
         }
@@ -89,16 +97,17 @@ public final class SmtpMailSender {
         message.setContent(alternatives);
         message.saveChanges();
 
-        Transport transport = session.getTransport("smtp");
+        Transport smtpTransport = session.getTransport("smtp");
         try {
+            boolean auth = !transport.user().isEmpty();
             if (auth) {
-                transport.connect(cfg.smtpHost(), cfg.smtpPort(), cfg.smtpUser(), cfg.smtpPassword());
+                smtpTransport.connect(transport.host(), transport.port(), transport.user(), transport.password());
             } else {
-                transport.connect();
+                smtpTransport.connect(transport.host(), transport.port(), null, null);
             }
-            transport.sendMessage(message, message.getAllRecipients());
+            smtpTransport.sendMessage(message, message.getAllRecipients());
         } finally {
-            transport.close();
+            smtpTransport.close();
         }
 
         String[] ids = message.getHeader("Message-ID");
@@ -107,9 +116,10 @@ public final class SmtpMailSender {
         return smtpId;
     }
 
-    private InternetAddress buildFromAddress() throws UnsupportedEncodingException, AddressException {
-        String email = cfg.fromEmail().trim();
-        String name = cfg.fromDisplayName().trim();
+    private InternetAddress buildFromAddress(SmtpTransportSettings transport)
+            throws UnsupportedEncodingException, AddressException {
+        String email = transport.fromEmail();
+        String name = transport.fromDisplayName();
         if (name.isEmpty()) {
             return new InternetAddress(email);
         }
