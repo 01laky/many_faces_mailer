@@ -1,13 +1,15 @@
 # many_faces_mailer
 
+**Version:** [`0.4.0`](./VERSION) · [Changelog](./CHANGELOG.md)
+
 **Transactional email worker for Many Faces AI.** This Java 21 gRPC service renders localized templates and sends them through SMTP, while the backend keeps all product policy and recipient decisions. Operators configure SMTP from **admin Settings → Infrastructure** (PostgreSQL + per-request gRPC); this worker renders and delivers only.
 
 ### Three pillars
 
-| Pillar | Highlights |
-| ------ | ----------- |
-| **Security** | gRPC **shared-secret** metadata (`x-mailer-worker-token`); optional **TLS** on listener; no public HTTP; backend is sole caller. Templates validated before send. |
-| **AI** | *Not applicable* — deterministic templated email only (Pebble + i18n bundles). |
+| Pillar            | Highlights                                                                                                                                                                                                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Security**      | gRPC **shared-secret** metadata (`x-mailer-worker-token`); optional **TLS** on listener; no public HTTP; backend is sole caller. Templates validated before send.                                                                                                             |
+| **AI**            | _Not applicable_ — deterministic templated email only (Pebble + i18n bundles).                                                                                                                                                                                                |
 | **Configuration** | **Per-request `SmtpTransportConfig`** from admin (host, port, TLS, credentials) **or** env fallback **`MAILER_SMTP_*`**; **`TestSmtpConnection`** RPC for smoke tests. Guide: [`../docs/guides/admin-mailer-configuration.md`](../docs/guides/admin-mailer-configuration.md). |
 
 Standalone **Java gRPC mailer worker** (SMTP, templated email, UTF-8 i18n) for Many Faces.  
