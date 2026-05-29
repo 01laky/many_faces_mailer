@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — **version h
 
 | Version       | Theme                                      |
 | ------------- | ------------------------------------------ |
+| [0.4.2](#042) | Patch release index sync                   |
+| [0.4.1](#041) | Patch                                      |
 | [0.4.0](#040) | SMTP override and TestSmtpConnection       |
 | [0.3.0](#030) | many_faces_proto and registration template |
 | [0.2.0](#020) | gRPC mailer and Mailpit dev                |
