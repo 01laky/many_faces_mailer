@@ -1,10 +1,11 @@
-# many_faces_mailer
+# Many Faces Mailer
 
 <!-- readme-badges:start -->
 
 [![version](https://img.shields.io/badge/version-0.4.2-blue)](./VERSION)
 ![Java](https://img.shields.io/badge/Java-21-f89820)
 ![Gradle](https://img.shields.io/badge/Gradle-8-02303A)
+![Pebble](https://img.shields.io/badge/Pebble-3.2-555555)
 ![gRPC](https://img.shields.io/badge/gRPC-TLS-244c5a)
 [![CI](https://github.com/01laky/many_faces_main/actions/workflows/ci.yml/badge.svg)](https://github.com/01laky/many_faces_main/actions/workflows/ci.yml)
 ![tests](https://img.shields.io/badge/tests-CI%20gated-brightgreen)
@@ -16,115 +17,185 @@
 
 **Author:** Ladislav Kostolny · [01laky@gmail.com](mailto:01laky@gmail.com)
 
-**Transactional email worker for Many Faces AI.** This Java 21 gRPC service renders localized templates and sends them through SMTP, while the backend keeps all product policy and recipient decisions. Operators configure SMTP from **admin Settings → Infrastructure** (PostgreSQL + per-request gRPC); this worker renders and delivers only.
+> **Transactional email worker for Many Faces AI.** Renders localized HTML + plain text email templates via Pebble and delivers them through SMTP. The backend holds all product policy and recipient decisions — this worker renders and delivers only. SMTP config comes from admin Settings → Infrastructure (stored in PostgreSQL, forwarded per-request). No public HTTP — only `many_faces_backend` calls this service.
 
-### Three pillars
+**Canonical repository:** [github.com/01laky/many_faces_mailer](https://github.com/01laky/many_faces_mailer)
 
-| Pillar            | Highlights                                                                                                                                                                                                                                                                    |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Security**      | gRPC **shared-secret** metadata (`x-mailer-worker-token`); optional **TLS** on listener; no public HTTP; backend is sole caller. Templates validated before send.                                                                                                             |
-| **AI**            | _Not applicable_ — deterministic templated email only (Pebble + i18n bundles).                                                                                                                                                                                                |
-| **Configuration** | **Per-request `SmtpTransportConfig`** from admin (host, port, TLS, credentials) **or** env fallback **`MAILER_SMTP_*`**; **`TestSmtpConnection`** RPC for smoke tests. Guide: [`../docs/guides/admin-mailer-configuration.md`](../docs/guides/admin-mailer-configuration.md). |
+---
 
-Standalone **Java gRPC mailer worker** (SMTP, templated email, UTF-8 i18n) for Many Faces.  
-Linked as a **git submodule** from `many_faces_main` at `many_faces_mailer/`.
-
-| Start here  | Value                                 |
-| ----------- | ------------------------------------- |
-| Worker gRPC | `localhost:59204` → container `50054` |
-| Dev SMTP    | Mailpit `localhost:51025`             |
-| Mailpit UI  | `http://localhost:58025`              |
-| Guide       | `../docs/guides/mailer-local-dev.md`  |
+## Quick Start
 
 ```bash
-# From many_faces_main root
-git submodule update --init --recursive many_faces_mailer
-```
+# Full stack (recommended)
+cd many_faces_main
+./scripts/start-all-dev.sh
 
-**Toolchain:** **Java 21** (Gradle toolchain + Foojay resolver for reproducible CI). **No Spring** — plain `main`, gRPC-Netty, Angus Mail, Pebble.
-
-## Architecture
-
-1. **`many_faces_backend`** decides policy (who receives which template) and calls **`SendTemplatedEmail`** over gRPC.
-2. This worker **renders** HTML + plain text from **`src/main/resources/templates/`** and subject lines from **`src/main/resources/i18n/`**.
-3. **SMTP** delivers to Mailpit (dev) or a transactional relay (prod). When the backend sends **`SmtpTransportConfig`** on the gRPC request (admin-configured relay), the worker uses that transport for the send; otherwise it falls back to **`MAILER_SMTP_*`** env (`MailerConfig.loadFromEnv()`).
-
-```mermaid
-flowchart LR
-    be["many_faces_backend"] --> grpc["SendTemplatedEmail gRPC"]
-    grpc --> val["Validate template params recipients"]
-    val --> tr["Resolve SMTP: wire block or env"]
-    tr --> peb["Pebble + ResourceBundle"]
-    peb --> smtp["Angus Mail SMTP"]
-    smtp --> sink["Mailpit or relay"]
-```
-
-**RPCs:** `SendTemplatedEmail`, `TestSmtpConnection` (TCP/STARTTLS probe, no message sent). See [`docs/guides/admin-mailer-configuration.md`](../docs/guides/admin-mailer-configuration.md).
-
-## Template catalog (v1)
-
-| `template_id`               | Required `params`                                                 | Supported locales (bundles) |
-| --------------------------- | ----------------------------------------------------------------- | --------------------------- |
-| `account_registration_code` | `action_link`, `registration_code`, `user_name`, `expiry_minutes` | `en`, `sk`                  |
-| `identity_email_confirm`    | `action_link`, `user_name`                                        | `en`, `sk`                  |
-| `identity_password_reset`   | `action_link`, `user_name`                                        | `en`, `sk`                  |
-
-**Signup:** `action_link` must include query **`?hash=`** (opaque invite id). Monorepo flow: **[`docs/guides/email-code-registration.md`](../docs/guides/email-code-registration.md)**.
-
-**Tests:** `AccountRegistrationCodeTemplateEdgeTest` (required params, render, HTML escape).
-
-## Ports
-
-| Component         | Internal gRPC | Default host map                           |
-| ----------------- | ------------- | ------------------------------------------ |
-| **mailer-worker** | **50054**     | **59204** (`MAILER_WORKER_GRPC_HOST_PORT`) |
-| **mailpit** SMTP  | **1025**      | **51025** (`MAILPIT_SMTP_HOST_PORT`)       |
-| **mailpit** UI    | **8025**      | **58025** (`MAILPIT_UI_HOST_PORT`)         |
-
-## Quick start (Docker)
-
-```bash
+# Standalone (worker + Mailpit)
+cd many_faces_mailer
 ./scripts/start-mailer-worker.sh
 ```
 
-Stop:
+**Ports (development):**
 
-```bash
-./scripts/stop-mailer-worker.sh
+| Endpoint           | Host                     | Container |
+| ------------------ | ------------------------ | --------- |
+| mailer-worker gRPC | `localhost:59204`        | `50054`   |
+| Mailpit SMTP       | `localhost:51025`        | `1025`    |
+| Mailpit web UI     | `http://localhost:58025` | `8025`    |
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    be["many_faces_backend"] --> grpc["SendTemplatedEmail<br/>gRPC :50054"]
+    grpc --> val["Validate params<br/>+ recipients"]
+    val --> tr["Resolve SMTP:<br/>wire SmtpConfig or env"]
+    tr --> peb["Pebble template<br/>+ ResourceBundle i18n"]
+    peb --> smtp["Angus Mail SMTP"]
+    smtp --> sink["Mailpit (dev)<br/>or relay (prod)"]
 ```
 
-## TLS / mTLS smoke (CI + local)
+1. **`many_faces_backend`** decides policy (who receives, which template) and calls `SendTemplatedEmail` over gRPC.
+2. This worker **renders** HTML + plain text from `src/main/resources/templates/` using Pebble, and subject lines from `src/main/resources/i18n/`.
+3. **SMTP** delivers to Mailpit in dev or an operator-configured transactional relay in production.
 
-- **`docker-compose.tls-smoke.yml`** — isolated worker with server TLS + mTLS (PEMs under **`MAILER_TLS_SMOKE_CERT_DIR`**). Default published gRPC: **`127.0.0.1:59216`** (does not collide with push TLS smoke **59215**).
-- **`scripts/smoke-grpc-tls.sh`** — generates a throwaway CA + certs, runs **`grpcurl`** `Health/Check`, then optional **`dotnet test`** filtered to **`MailerWorkerTlsEndToEndSmokeTests`** (`MAILER_TLS_SMOKE=1`). Docker Compose project: **`mf-mailer-tls-smoke`** (same name as `clear-all-dev.sh`).
+**Toolchain:** Java 21 · Gradle 8 with Foojay resolver · gRPC-Netty · Angus Mail · Pebble. **No Spring** — plain `main`, minimal dependencies.
 
-Monorepo guide: **`docs/guides/mailer-grpc-tls-mtls.md`**.
+---
 
-## C# client stubs (many_faces_backend)
+## Three Pillars
 
-The canonical **`.proto`** lives in the **`many_faces_proto`** submodule **nested under this repository** (`manyfaces/mailer/v1/mailer.proto`). Gradle resolves **`many_faces_proto/proto`**. **`many_faces_backend`** generates the C# client from its own nested **`many_faces_proto`** via `BeDemo.Api.csproj`.
+| Pillar            | Highlights                                                                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Security**      | gRPC **shared-secret** metadata (`x-mailer-worker-token`); optional **TLS** on listener; no public HTTP; backend is sole caller; templates validated before send; SMTP credentials never logged. |
+| **AI**            | Not applicable — deterministic localized template rendering only.                                                                                                                                |
+| **Configuration** | **Per-request `SmtpTransportConfig`** from admin (host, port, TLS mode, credentials) **or** env fallback `MAILER_SMTP_*`; **`TestSmtpConnection`** RPC (TCP/STARTTLS probe, no message sent).    |
 
-## Environment
+---
 
-See **`.env.example`**. For monorepo wiring (Mailpit, `Mail:*`, grpcurl), read **`docs/guides/mailer-local-dev.md`** in the parent repository.
+## RPCs
 
-## Correlation (gRPC metadata)
+| RPC                             | Purpose                                                                          |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| `SendTemplatedEmail`            | Render + deliver one transactional email (HTML + plain text)                     |
+| `TestSmtpConnection`            | TCP/STARTTLS smoke probe — validates SMTP reachability without sending a message |
+| `grpc.health.v1 / Health.Check` | gRPC health probe                                                                |
 
-`many_faces_backend` forwards these **metadata keys** (lowercase ASCII) on `SendTemplatedEmail` so worker logs can join API traces:
+---
 
-| Metadata key   | Source (typical)           |
+## Template Catalog (v1)
+
+| `template_id`               | Required `params`                                                 | Locales    |
+| --------------------------- | ----------------------------------------------------------------- | ---------- |
+| `account_registration_code` | `action_link`, `registration_code`, `user_name`, `expiry_minutes` | `en`, `sk` |
+| `identity_email_confirm`    | `action_link`, `user_name`                                        | `en`, `sk` |
+| `identity_password_reset`   | `action_link`, `user_name`                                        | `en`, `sk` |
+
+**Signup note:** `action_link` for registration must include `?hash=` (opaque invite id). Full flow: [`../docs/guides/email-code-registration.md`](../docs/guides/email-code-registration.md).
+
+**Tests:** `AccountRegistrationCodeTemplateEdgeTest` — required params, full render, HTML escape.
+
+---
+
+## Correlation (gRPC Metadata)
+
+`many_faces_backend` forwards these metadata keys so worker logs can join API traces:
+
+| Metadata key   | Source                     |
 | -------------- | -------------------------- |
 | `x-request-id` | HTTP `X-Request-Id`        |
 | `traceparent`  | W3C trace context          |
 | `tracestate`   | W3C trace state (optional) |
 
-`MailerCorrelationInterceptor` copies them into **SLF4J `MDC`**: `correlation_id` (from `x-request-id`, else trace id from `traceparent`, else UUID), plus `traceparent` / `tracestate` when present. The RPC response `correlation_id` field matches `MDC` for successful sends.
+`MailerCorrelationInterceptor` copies them into **SLF4J MDC**: `correlation_id` (`x-request-id` → `traceparent` trace id → UUID), plus `traceparent` / `tracestate` when present. The RPC response `correlation_id` field matches MDC for correlation.
 
-## Security
+---
 
-- **Spoofed gRPC sends** — any process that can reach the listener can invoke the worker; require **`MAILER_WORKER_EXPECTED_TOKEN`** (and TLS/mTLS for shared networks) before non-local exposure.
-- **Credential theft** — SMTP credentials are high value; restrict mounts and env injection; rotate on compromise.
+## TLS / mTLS Smoke
 
-## License
+```bash
+chmod +x many_faces_mailer/scripts/smoke-grpc-tls.sh
+many_faces_mailer/scripts/smoke-grpc-tls.sh
+```
 
-See the root monorepo or team policy (demo stack).
+Uses `docker-compose.tls-smoke.yml` (host gRPC: `59216` — does not collide with push smoke `59215`). Generates a throwaway CA + certs, runs `grpcurl Health/Check`, then optional `dotnet test` (`MAILER_TLS_SMOKE=1`).
+
+Full guide: [`../docs/guides/mailer-grpc-tls-mtls.md`](../docs/guides/mailer-grpc-tls-mtls.md)
+
+---
+
+## Ports
+
+| Component                        | Internal gRPC | Host map                                     |
+| -------------------------------- | ------------- | -------------------------------------------- |
+| many_faces_ai                    | `50051`       | —                                            |
+| many_faces_elastic search-worker | `50052`       | `59202`                                      |
+| many_faces_push push-worker      | `50053`       | `59203`                                      |
+| **mailer-worker**                | **`50054`**   | **`59204`** (`MAILER_WORKER_GRPC_HOST_PORT`) |
+| **mailpit** SMTP                 | **`1025`**    | **`51025`** (`MAILPIT_SMTP_HOST_PORT`)       |
+| **mailpit** UI                   | **`8025`**    | **`58025`** (`MAILPIT_UI_HOST_PORT`)         |
+
+---
+
+## Scripts
+
+| Script                             | Purpose                |
+| ---------------------------------- | ---------------------- |
+| `./scripts/start-mailer-worker.sh` | Start worker + Mailpit |
+| `./scripts/stop-mailer-worker.sh`  | Stop containers        |
+| `./scripts/smoke-grpc-tls.sh`      | TLS/mTLS smoke test    |
+
+---
+
+## Proto Contracts
+
+Canonical `.proto` lives in the nested **`many_faces_proto`** submodule at `many_faces_mailer/many_faces_proto/`:
+
+```
+manyfaces/mailer/v1/mailer.proto
+```
+
+Gradle resolves `many_faces_proto/proto` at build time. `many_faces_backend` generates its own C# client stubs from its own nested `many_faces_proto` via `BeDemo.Api.csproj`.
+
+```bash
+git submodule update --init --recursive   # populate nested submodule
+```
+
+---
+
+## Security Notes
+
+| Risk                   | Mitigation                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| **Spoofed gRPC sends** | Require `MAILER_WORKER_EXPECTED_TOKEN` + TLS before non-local exposure        |
+| **Credential theft**   | SMTP credentials are high value; restrict env injection; rotate on compromise |
+| **Template injection** | Pebble auto-escapes HTML; params validated before render                      |
+
+---
+
+## Monorepo Integration
+
+- Submodule path: `many_faces_mailer/` under `many_faces_main`
+- Initialize: `git submodule update --init --recursive many_faces_mailer`
+- Backend wires via `Mail__WorkerGrpcUrl` (or `Mail__WorkerAuthToken` for secret)
+- Dev Mailpit (`localhost:58025`) catches all outbound email — no external sends in dev
+
+---
+
+## Documentation
+
+| Topic                       | Link                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Local dev wiring**        | [`../docs/guides/mailer-local-dev.md`](../docs/guides/mailer-local-dev.md)                     |
+| **Admin SMTP config**       | [`../docs/guides/admin-mailer-configuration.md`](../docs/guides/admin-mailer-configuration.md) |
+| **TLS / mTLS**              | [`../docs/guides/mailer-grpc-tls-mtls.md`](../docs/guides/mailer-grpc-tls-mtls.md)             |
+| **Email registration flow** | [`../docs/guides/email-code-registration.md`](../docs/guides/email-code-registration.md)       |
+| **Monorepo docs hub**       | [`../docs/README.md`](../docs/README.md)                                                       |
+
+---
+
+## Project Status
+
+Active transactional email worker for the Many Faces AI monorepo. v0.4.2 — `SendTemplatedEmail` (Pebble HTML+text, en/sk), `TestSmtpConnection`, per-request SMTP transport override, correlation interceptor, gRPC TLS/mTLS, Mailpit dev sink. Tracked in [`CHANGELOG.md`](./CHANGELOG.md).
