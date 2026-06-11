@@ -5,7 +5,6 @@
 [![version](https://img.shields.io/badge/version-0.4.2-blue)](./VERSION)
 ![Java](https://img.shields.io/badge/Java-21-f89820)
 ![Gradle](https://img.shields.io/badge/Gradle-8-02303A)
-![Pebble](https://img.shields.io/badge/Pebble-3.2-555555)
 ![gRPC](https://img.shields.io/badge/gRPC-TLS-244c5a)
 [![CI](https://github.com/01laky/many_faces_main/actions/workflows/ci.yml/badge.svg)](https://github.com/01laky/many_faces_main/actions/workflows/ci.yml)
 ![tests](https://img.shields.io/badge/tests-CI%20gated-brightgreen)
