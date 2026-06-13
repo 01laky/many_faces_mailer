@@ -25,6 +25,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — **version h
 
 ---
 
+## [0.4.3]
+
+### Changed
+
+- Align the `many_faces_proto` submodule pointer to `d03301c` (latest), matching `many_faces_backend`/`many_faces_ai` for monorepo-wide proto consistency. The bump only adds the additive `health.proto` `GenerateRequest` fields (per-call temperature/stop/model); the `manyfaces.mailer.v1` contract and mailer-worker code are unchanged.
+
+---
+
 ## [0.4.2]
 
 ### Added
@@ -93,7 +101,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — **version h
 
 - many_faces_mailer skeleton with README, compose, and CI.
 
-[Unreleased]: https://github.com/01laky/many_faces_mailer/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/01laky/many_faces_mailer/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/01laky/many_faces_mailer/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/01laky/many_faces_mailer/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/01laky/many_faces_mailer/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/01laky/many_faces_mailer/compare/v0.3.0...v0.4.0
