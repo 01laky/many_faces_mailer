@@ -8,6 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — **version h
 
 | Version       | Theme                                      |
 | ------------- | ------------------------------------------ |
+| [0.4.5](#045) | Recipient domain policy documented (MAIL-5) |
 | [0.4.4](#044) | TLS-loader + SMTP-probe unit tests         |
 | [0.4.3](#043) | Proto pointer sync                         |
 | [0.4.2](#042) | Patch release index sync                   |
@@ -24,6 +25,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — **version h
 ### Changed
 
 ### Fixed
+
+---
+
+## [0.4.5]
+
+### Added
+
+- **Documented the recipient domain policy gap (SHV2 MAIL-5).** The README's security notes now record that the worker sends to whatever recipient it is given: `MailerServiceImpl` and `SmtpMailSender` validate message shape (required template params, address parseability, `transport.validateForSend()`) but never the recipient's domain, so anyone who can reach the gRPC port with the shared token can have a Many-Faces-branded mail delivered from the configured `From` address to any mailbox. That is acceptable only because the port is internal and `many_faces_backend` — the sole caller — derives recipients from its own database rather than from client input. Added a decision table for production (domain allow-list for internal/staff faces; volume and per-recipient rate caps plus aligned DKIM/SPF/DMARC for a public product; never expose the port either way) and a note on where such a check would belong if moved into the worker (alongside `transport.validateForSend()`, failing with `INVALID_ARGUMENT` rather than filtering silently, so the backend never records a send that did not happen).
 
 ---
 
@@ -95,7 +104,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — **version h
 
 - many_faces_mailer skeleton with README, compose, and CI.
 
-[Unreleased]: https://github.com/01laky/many_faces_mailer/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/01laky/many_faces_mailer/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/01laky/many_faces_mailer/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/01laky/many_faces_mailer/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/01laky/many_faces_mailer/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/01laky/many_faces_mailer/compare/v0.4.1...v0.4.2

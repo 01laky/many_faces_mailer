@@ -2,7 +2,7 @@
 
 <!-- readme-badges:start -->
 
-[![version](https://img.shields.io/badge/version-0.4.4-blue)](./VERSION)
+[![version](https://img.shields.io/badge/version-0.4.5-blue)](./VERSION)
 ![Java](https://img.shields.io/badge/Java-21-f89820)
 ![Gradle](https://img.shields.io/badge/Gradle-8-02303A)
 ![gRPC](https://img.shields.io/badge/gRPC-TLS-244c5a)
@@ -12,7 +12,7 @@
 
 <!-- readme-badges:end -->
 
-**Version:** [`0.4.4`](./VERSION) · [Changelog](./CHANGELOG.md)
+**Version:** [`0.4.5`](./VERSION) · [Changelog](./CHANGELOG.md)
 
 **Author:** Ladislav Kostolny · [01laky@gmail.com](mailto:01laky@gmail.com)
 
@@ -171,6 +171,36 @@ git submodule update --init --recursive   # populate nested submodule
 | **Spoofed gRPC sends** | Require `MAILER_WORKER_EXPECTED_TOKEN` + TLS before non-local exposure        |
 | **Credential theft**   | SMTP credentials are high value; restrict env injection; rotate on compromise |
 | **Template injection** | Pebble auto-escapes HTML; params validated before render                      |
+| **Open relay by proxy** | No recipient domain policy in the worker — see below (SHV2 MAIL-5)           |
+
+### Recipient domain policy (SHV2 MAIL-5)
+
+**The worker sends to whatever recipient it is given.** `MailerServiceImpl` and `SmtpMailSender`
+validate message *shape* — required template params, address parseability, `transport.validateForSend()`
+— but neither checks the recipient's **domain**. Anyone who can reach the gRPC port with the shared
+token can therefore have this worker deliver a Many-Faces-branded email, from the configured `From`
+address, to any mailbox on the internet.
+
+That is acceptable in the current design only because the port is internal and
+`many_faces_backend` is the sole caller: the backend derives recipients from its own database
+(registration invites, notification preferences), never from client-supplied input. The security
+property lives entirely on that side.
+
+For production, decide explicitly which of these applies and configure it **at the relay**, since the
+worker has no such control today:
+
+| Deployment shape | Recommended policy |
+| --- | --- |
+| Internal / staff-only faces | Restrict the relay to an allow-list of corporate domains. A leak then cannot mail the public. |
+| Public product (real end users) | Domain allow-listing is not workable. Instead cap per-hour volume and per-recipient rate at the relay, alert on spikes, and keep DKIM/SPF/DMARC aligned so the sending domain cannot be abused. |
+| Any shape | Never expose the gRPC port outside the internal network, even with the token set — the hardened profile publishes no host port for it. |
+
+If a domain policy is ever needed *inside* the worker, add it in `SmtpMailSender` at the same point
+as `transport.validateForSend()` and fail the RPC with `INVALID_ARGUMENT` — do not filter silently,
+or the backend will record a send that never happened.
+
+Related: [`hardened-vs-dev-compose.md`](../docs/guides/hardened-vs-dev-compose.md), and MAIL-3 on the
+backend side, which pins the `action_link` in registration mail to an https host allow-list.
 
 ---
 
